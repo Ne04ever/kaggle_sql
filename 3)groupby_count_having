@@ -1,0 +1,143 @@
+COUNT()
+
+COUNT(), as you may have guessed from the name, returns a count of things. If you pass it the name of a column, it will return the number of entries in that column.
+
+For instance, if we SELECT the COUNT() of the ID column in the pets table, it will return 4, because there are 4 ID's in the table.
+
+
+
+
+GROUP BY
+
+GROUP BY takes the name of one or more columns, and treats all rows with the same value in that column as a single group when you apply aggregate functions like COUNT().
+
+
+
+
+GROUP BY ... HAVING
+
+HAVING is used in combination with GROUP BY to ignore groups that don't meet certain criteria.
+
+
+
+
+eg
+
+ The Hacker News dataset contains information on stories and comments from the Hacker News social networking site.
+
+We'll work with the comments table and begin by printing the first few rows. (We have hidden the corresponding code. To take a peek, click on the "Code" button below.)
+
+Using Kaggle's public dataset BigQuery integration.
+
+	id 	by 	author 	time 	time_ts 	text 	parent 	deleted 	dead 	ranking
+0 	2701393 	5l 	5l 	1309184881 	2011-06-27 14:28:01+00:00 	And the glazier who fixed all the broken windo... 	2701243 	None 	None 	0
+1 	5811403 	99 	99 	1370234048 	2013-06-03 04:34:08+00:00 	Does canada have the equivalent of H1B/Green c... 	5804452 	None 	None 	0
+2 	21623 	AF 	AF 	1178992400 	2007-05-12 17:53:20+00:00 	Speaking of Rails, there are other options in ... 	21611 	None 	None 	0
+3 	10159727 	EA 	EA 	1441206574 	2015-09-02 15:09:34+00:00 	Humans and large livestock (and maybe even pet... 	10159396 	None 	None 	0
+4 	2988424 	Iv 	Iv 	1315853580 	2011-09-12 18:53:00+00:00 	I must say I reacted in the same way when I re... 	2988179 	None 	None 	0
+
+
+
+we can GROUP BY the parent column and COUNT() the id column in order to figure out the number of comments that were made as responses to a specific comment. 
+
+Furthermore, since we're only interested in popular comments, we'll look at comments with more than ten replies. So, we'll only return groups HAVING more than ten ID's.
+
+# Query to select comments that received more than 10 replies
+query_popular = """
+                SELECT parent, COUNT(id)
+                FROM `bigquery-public-data.hacker_news.comments`
+                GROUP BY parent
+                HAVING COUNT(id) > 10
+                """
+
+
+
+
+Now that our query is ready, let's run it and store the results in a pandas DataFrame:
+
+# Set up the query (cancel the query if it would use too much of 
+# your quota, with the limit set to 10 GB)
+safe_config = bigquery.QueryJobConfig(maximum_bytes_billed=10**10)
+query_job = client.query(query_popular, job_config=safe_config)
+
+# API request - run the query, and convert the results to a pandas DataFrame
+popular_comments = query_job.to_dataframe()
+
+# Print the first five rows of the DataFrame
+popular_comments.head()
+
+	parent 	f0_
+0 	6855145 	39
+1 	3495062 	38
+2 	6969401 	48
+3 	4349650 	44
+4 	9162566 	41
+
+
+
+
+
+
+Aliasing and other improvements
+
+A couple hints to make your queries even better:
+
+    The column resulting from COUNT(id) was called f0__. That's not a very descriptive name. You can change the name by adding AS NumPosts after you specify the aggregation. This is called aliasing, and it will be covered in more detail in an upcoming lesson.
+    If you are ever unsure what to put inside the COUNT() function, you can do COUNT(1) to count the rows in each group. Most people find it especially readable, because we know it's not focusing on other columns. It also scans less data than if supplied column names (making it faster and using less of your data access quota).
+
+Using these tricks, we can rewrite our query:
+
+# Improved version of earlier query, now with aliasing & improved readability
+query_improved = """
+                 SELECT parent, COUNT(1) AS NumPosts
+                 FROM `bigquery-public-data.hacker_news.comments`
+                 GROUP BY parent
+                 HAVING COUNT(1) > 10
+                 """
+
+safe_config = bigquery.QueryJobConfig(maximum_bytes_billed=10**10)
+query_job = client.query(query_improved, job_config=safe_config)
+
+# API request - run the query, and convert the results to a pandas DataFrame
+improved_df = query_job.to_dataframe()
+
+# Print the first five rows of the DataFrame
+improved_df.head()
+
+	parent 	NumPosts
+0 	6683866 	39
+1 	6627329 	46
+2 	3476843 	49
+3 	7234010 	48
+4 	2932956 	76
+
+
+
+
+using GROUP BY that because it tells SQL how to apply aggregate functions (like COUNT()), it doesn't make sense to use GROUP BY without an aggregate function. Similarly, if you have any GROUP BY clause, then all variables must be passed to either a
+
+    GROUP BY command, or
+    an aggregation function.
+
+Consider the query below:
+
+query_good = """
+             SELECT parent, COUNT(id)
+             FROM `bigquery-public-data.hacker_news.comments`
+             GROUP BY parent
+             """
+
+Note that there are two variables: parent and id.
+
+    parent was passed to a GROUP BY command (in GROUP BY parent), and
+    id was passed to an aggregate function (in COUNT(id)).
+
+And this query won't work, because the author column isn't passed to an aggregate function or a GROUP BY clause:
+
+query_bad = """
+            SELECT author, parent, COUNT(id)
+            FROM `bigquery-public-data.hacker_news.comments`
+            GROUP BY parent
+            """
+
+If make this error, you'll get the error message SELECT list expression references column (column's name) which is neither grouped nor aggregated at

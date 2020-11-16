@@ -1,0 +1,87 @@
+ORDER BY
+You can reverse the order using the DESC argument (short for 'descending'). 
+
+
+
+
+Dates
+There are two ways that dates can be stored in BigQuery: as a DATE or as a DATETIME.
+
+The DATE format has the year first, then the month, and then the day. It looks like this:
+
+YYYY-[M]M-[D]D
+
+    YYYY: Four-digit year
+    [M]M: One or two digit month
+    [D]D: One or two digit day
+
+The DATETIME format is like the date format ... but with time added at the end.
+
+
+
+
+
+EXTRACT
+Often you'll want to look at part of a date, like the year or the day. You can do this with EXTRACT. 
+You can find all the functions you can use with dates in BigQuery in this documentation under "Date and time functions".
+
+
+
+
+
+Example: Which day of the week has the most fatal motor accidents?
+
+Let's use the US Traffic Fatality Records database, which contains information on traffic accidents in the US where at least one person died.
+
+
+Let's use the table to determine how the number of accidents varies with the day of the week. Since:
+
+    the consecutive_number column contains a unique ID for each accident, and
+    the timestamp_of_crash column contains the date of the accident in DATETIME format,
+
+we can:
+
+    EXTRACT the day of the week (as day_of_week in the query below) from the timestamp_of_crash column, and
+    GROUP BY the day of the week, before we COUNT the consecutive_number column to determine the number of accidents for each day of the week.
+
+Then we sort the table with an ORDER BY clause, so the days with the most accidents are returned first.
+
+
+
+
+code
+
+
+# Query to find out the number of accidents for each day of the week
+query = """
+        SELECT COUNT(consecutive_number) AS num_accidents, 
+               EXTRACT(DAYOFWEEK FROM timestamp_of_crash) AS day_of_week
+        FROM `bigquery-public-data.nhtsa_traffic_fatalities.accident_2015`
+        GROUP BY day_of_week
+        ORDER BY num_accidents DESC
+        """
+
+As usual, we run it as follows:
+
+# Set up the query (cancel the query if it would use too much of 
+# your quota, with the limit set to 1 GB)
+safe_config = bigquery.QueryJobConfig(maximum_bytes_billed=10**9)
+query_job = client.query(query, job_config=safe_config)
+
+# API request - run the query, and convert the results to a pandas DataFrame
+accidents_by_day = query_job.to_dataframe()
+
+# Print the DataFrame
+accidents_by_day
+
+	num_accidents 	day_of_week
+0 	5659 	7
+1 	5298 	1
+2 	4916 	6
+3 	4460 	5
+4 	4182 	4
+5 	4038 	2
+6 	3985 	3
+
+Notice that the data is sorted by the num_accidents column, where the days with more traffic accidents appear first.
+
